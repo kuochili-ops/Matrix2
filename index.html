@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Matrix Secret - UI Optimized</title>
+    <title>Matrix Secret - Stealth UI</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@900&display=swap" rel="stylesheet">
     <style>
         body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: sans-serif; height: 100vh; }
@@ -11,16 +11,33 @@
         #bg-video { width: 100%; height: 100%; object-fit: cover; display: none; }
         #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
         
+        /* 透明遮罩層：負責監聽點擊 */
+        #touch-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 50;
+            cursor: pointer;
+        }
+
         #app-ui { 
             position: absolute; bottom: 0; left: 0; width: 100%; z-index: 100; 
             background: rgba(0,0,0,0.85); backdrop-filter: blur(15px); 
             border-top: 1px solid #0f4; 
-            /* 面板位置優化：增加底部安全區域，微調內距 */
             padding-bottom: calc(10px + env(safe-area-inset-bottom));
-            transition: transform 0.3s ease;
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            /* 預設隱藏面板 */
+            transform: translateY(110%);
         }
         
-        #app-ui.viewer-mode { background: transparent; border: none; bottom: 8%; display: flex; justify-content: center; }
+        /* 面板顯示狀態 */
+        #app-ui.show { transform: translateY(0); }
+
+        /* 接收者模式下的特殊位置 */
+        #app-ui.viewer-mode { background: transparent; border: none; bottom: 8%; display: flex; justify-content: center; transform: translateY(0); }
+        #app-ui.viewer-mode.hidden-btn { transform: translateY(200%); }
 
         .ui-content { padding: 8px 0; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; }
         .ui-row { width: 92%; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
@@ -40,6 +57,7 @@
 
 <div id="media-bg"><video id="bg-video" autoplay playsinline muted></video></div>
 <div id="canvas-container"></div>
+<div id="touch-overlay"></div>
 
 <div id="app-ui">
     <div class="ui-content">
@@ -59,7 +77,6 @@
         <div class="ui-row" style="justify-content: center; gap: 10px;">
             <button class="btn" id="decodeBtn" style="border-color:#f44; color:#f44; flex: 1.5;">⚡ 破解訊息</button>
             <button class="btn creator-only" id="shareBtn" style="border-color:#0af; color:#0af;">🔗 分享</button>
-            <button class="btn creator-only" id="camBtn">📷 鏡頭</button>
         </div>
     </div>
 </div>
@@ -83,7 +100,6 @@
             this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 5000);
             this.camera.position.z = 1000;
             
-            // 全方位字元庫
             const kana = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン";
             const bopomofo = "ㄅㄆㄇㄈㄉㄊㄋㄌㄍㄎㄏㄐㄑㄒㄓㄔㄕㄖㄗㄘㄙㄚㄛㄜㄝㄞㄟㄠㄡㄢㄣㄤㄥㄦㄧㄨㄩ";
             const bagua = "☰☱☲☳☴☵☶☷";
@@ -124,12 +140,19 @@
                 ui.classList.add('viewer-mode');
                 creators.forEach(el => el.classList.add('hidden'));
             }
-            // 預設不再調用 startCam()
         }
 
         _initUI() {
             const get = (id) => document.getElementById(id);
+            const ui = get('app-ui');
             const dBtn = get('decodeBtn');
+            const overlay = get('touch-overlay');
+
+            // 點擊遮罩切換面板顯示/隱藏
+            overlay.onclick = () => {
+                if (ui.classList.contains('viewer-mode')) return; // 接收者模式不切換
+                ui.classList.toggle('show');
+            };
 
             get('rowSlider').oninput = (e) => { 
                 this.params.midRows = parseInt(e.target.value); 
@@ -147,6 +170,7 @@
                     if (!this.params.decodeMsg) this.params.decodeMsg = get('decodeInput').value;
                     dBtn.classList.add('active');
                     dBtn.innerText = "🛑 停止破解";
+                    // 接收者模式點擊後，按鈕也可以考慮隱藏或縮小
                 } else {
                     dBtn.classList.remove('active');
                     dBtn.innerText = "⚡ 破解訊息";
@@ -158,10 +182,8 @@
                 const rows = get('rowSlider').value;
                 const speed = get('speedSlider').value;
                 const shareUrl = `${window.location.origin}${window.location.pathname}?text=${text}&rows=${rows}&speed=${speed}`;
-                navigator.clipboard.writeText(shareUrl).then(() => alert("加密連結已複製！"));
+                navigator.clipboard.writeText(shareUrl).then(() => alert("加密連結已複製！點擊畫面任何處可收合面板。"));
             };
-
-            get('camBtn').onclick = () => this.startCam();
         }
 
         _createTex(char, isNear, isRed) {
@@ -234,14 +256,6 @@
             });
             this.renderer.render(this.scene, this.camera);
             requestAnimationFrame(() => this._animate());
-        }
-
-        async startCam() {
-            try {
-                const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-                document.getElementById('bg-video').srcObject = s;
-                document.getElementById('bg-video').style.display = 'block';
-            } catch(e) { alert("無法啟動相機，請檢查權限設定。"); }
         }
 
         onResize() {
