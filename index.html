@@ -3,12 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Matrix Secret - 3D Stealth UI</title>
+    <title>Matrix Secret - 3D Volume Edition</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@900&display=swap" rel="stylesheet">
     <style>
         body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: sans-serif; height: 100vh; }
-        #media-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-        #bg-video { width: 100%; height: 100%; object-fit: cover; display: none; }
         #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
         
         #touch-overlay {
@@ -20,13 +18,12 @@
             background: rgba(0,0,0,0.85); backdrop-filter: blur(15px); 
             border-top: 1px solid #0f4; 
             padding-bottom: calc(10px + env(safe-area-inset-bottom));
-            /* 調整速度：0.8秒緩慢升起 */
+            /* 調整為 0.8s 緩慢優雅升起 */
             transition: transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
             transform: translateY(110%);
         }
         
         #app-ui.show { transform: translateY(0); }
-
         #app-ui.viewer-mode { background: transparent; border: none; bottom: 8%; display: flex; justify-content: center; transform: translateY(0); }
 
         .ui-content { padding: 8px 0; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; }
@@ -45,7 +42,6 @@
 </head>
 <body>
 
-<div id="media-bg"><video id="bg-video" autoplay playsinline muted></video></div>
 <div id="canvas-container"></div>
 <div id="touch-overlay"></div>
 
@@ -90,16 +86,11 @@
             this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 5000);
             this.camera.position.z = 1000;
             
-            const pool = "アイウエオカキクケコㄅㄆㄇㄈ☰☱☲甲乙丙丁子丑寅卯國英理化數0123456789+−×÷ABCDEFG郭啟利";
+            const pool = "アイウエオㄅㄆㄇㄈ☰☱甲乙丙丁子丑國英理化0123+−×ABC郭啟利";
 
             this.params = { 
-                speed: 4, 
-                midRows: 12, 
-                decodeMsg: "", 
-                decodeIdx: 0, 
-                isCracking: false, 
-                lastDecodeTime: 0,
-                chars: pool
+                speed: 4, midRows: 12, decodeMsg: "", decodeIdx: 0, 
+                isCracking: false, lastDecodeTime: 0, chars: pool
             };
             this.charGroups = [];
             
@@ -168,8 +159,12 @@
         }
 
         updateRows() {
-            this.charGroups.forEach(g => { g.children[0].material.map.dispose(); this.scene.remove(g); });
+            this.charGroups.forEach(g => { 
+                g.children.forEach(c => { c.material.map.dispose(); c.material.dispose(); });
+                this.scene.remove(g); 
+            });
             this.charGroups = [];
+            
             const layers = [
                 { n: 'F', z: -950, sz: 60, m: 2.8, sp: 2.2 },
                 { n: 'M', z: 0,    sz: 90, m: 1.0, sp: 1.3 }, 
@@ -180,16 +175,28 @@
                 const rows = Math.max(1, Math.floor(this.params.midRows * l.m));
                 const totalW = window.innerWidth * (1 + Math.abs(l.z)/1000) * l.sp;
                 const spacing = totalW / rows;
+                const texPool = this.params.chars.split('').map(c => this._createTex(c, l.n==='N', false));
+
                 for (let r = 0; r < rows; r++) {
                     const g = new THREE.Group();
-                    const rc = this.params.chars[Math.floor(Math.random()*this.params.chars.length)];
-                    const m = new THREE.Mesh(
-                        new THREE.PlaneGeometry(l.sz, l.sz), 
-                        new THREE.MeshBasicMaterial({ map: this._createTex(rc, l.n==='N', false), transparent: true, side: THREE.DoubleSide })
-                    );
-                    g.add(m);
-                    // 加入隨機旋轉偏量與旋轉速度
-                    g.userData = { l, off: Math.random()*1000, spd: 0.8+Math.random()*0.4, rotSpd: (Math.random()-0.5)*0.05 };
+                    const rt = texPool[Math.floor(Math.random()*texPool.length)];
+                    
+                    // 實作輕微厚度：疊加 3 層
+                    for (let i = 0; i < 3; i++) {
+                        const m = new THREE.Mesh(
+                            new THREE.PlaneGeometry(l.sz, l.sz), 
+                            new THREE.MeshBasicMaterial({ 
+                                map: rt, 
+                                transparent: true, 
+                                side: THREE.DoubleSide,
+                                color: new THREE.Color(1, 1, 1).multiplyScalar(1 - i * 0.25) // 越深越暗
+                            })
+                        );
+                        m.position.z = -i * 2.5; // 每層位移 2.5 單位
+                        g.add(m);
+                    }
+                    
+                    g.userData = { l, off: Math.random()*1000, spd: 0.8+Math.random()*0.4, rotSpd: (Math.random()-0.5)*0.06 };
                     g.position.set((r - (rows - 1)/2) * spacing, 2000, l.z);
                     this.scene.add(g);
                     this.charGroups.push(g);
@@ -206,8 +213,8 @@
                     const pool = this.charGroups.filter(g => !g.userData.isD && g.userData.l.n !== 'F' && Math.abs(g.position.y) < 850);
                     if (pool.length > 0) {
                         const t = pool[Math.floor(Math.random()*pool.length)];
-                        t.children[0].material.map.dispose();
-                        t.children[0].material.map = this._createTex(this.params.decodeMsg[this.params.decodeIdx % this.params.decodeMsg.length], t.userData.l.n==='N', true);
+                        const newTex = this._createTex(this.params.decodeMsg[this.params.decodeIdx % this.params.decodeMsg.length], t.userData.l.n==='N', true);
+                        t.children.forEach(c => { c.material.map = newTex; });
                         t.userData.isD = true;
                         this.params.decodeIdx++;
                         this.params.lastDecodeTime = now;
@@ -218,17 +225,13 @@
             this.charGroups.forEach(g => {
                 const p = (time * g.userData.l.m * g.userData.spd + g.userData.off) % 6;
                 g.position.y = 1500 - p * 600;
-                
-                // 核心更新：加入 Y 軸旋轉，產生立體側邊感
-                g.rotation.y += g.userData.rotSpd;
+                g.rotation.y += g.userData.rotSpd; // 隨機 Y 軸旋轉展現厚度
 
-                if (g.position.y < -1100) {
-                    if (g.userData.isD) {
-                        g.userData.isD = false;
-                        const rc = this.params.chars[Math.floor(Math.random()*this.params.chars.length)];
-                        g.children[0].material.map.dispose();
-                        g.children[0].material.map = this._createTex(rc, g.userData.l.n==='N', false);
-                    }
+                if (g.position.y < -1100 && g.userData.isD) {
+                    g.userData.isD = false;
+                    const rc = this.params.chars[Math.floor(Math.random()*this.params.chars.length)];
+                    const resetTex = this._createTex(rc, g.userData.l.n==='N', false);
+                    g.children.forEach(c => { c.material.map = resetTex; });
                 }
             });
             this.renderer.render(this.scene, this.camera);
