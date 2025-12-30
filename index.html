@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Matrix Secret - Oriental Code</title>
+    <title>Matrix Secret - UI Optimized</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@900&display=swap" rel="stylesheet">
     <style>
         body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: sans-serif; height: 100vh; }
@@ -14,24 +14,26 @@
         #app-ui { 
             position: absolute; bottom: 0; left: 0; width: 100%; z-index: 100; 
             background: rgba(0,0,0,0.85); backdrop-filter: blur(15px); 
-            border-top: 1px solid #0f4; padding-bottom: env(safe-area-inset-bottom);
+            border-top: 1px solid #0f4; 
+            /* 面板位置優化：增加底部安全區域，微調內距 */
+            padding-bottom: calc(10px + env(safe-area-inset-bottom));
             transition: transform 0.3s ease;
         }
         
-        #app-ui.viewer-mode { background: transparent; border: none; bottom: 12%; display: flex; justify-content: center; }
+        #app-ui.viewer-mode { background: transparent; border: none; bottom: 8%; display: flex; justify-content: center; }
 
-        .ui-content { padding: 15px 0; display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
-        .ui-row { width: 90%; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .ui-content { padding: 8px 0; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; }
+        .ui-row { width: 92%; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
         
-        .btn { flex: 1; height: 50px; background: #111; border: 1px solid #0f4; border-radius: 8px; color: #0f4; font-weight: bold; font-size: 14px; transition: 0.3s; cursor: pointer; }
+        .btn { flex: 1; height: 46px; background: #111; border: 1px solid #0f4; border-radius: 8px; color: #0f4; font-weight: bold; font-size: 13px; transition: 0.3s; cursor: pointer; }
         .btn.active { background: #f44; color: #fff; border-color: #fff; box-shadow: 0 0 25px #f44; }
         
         .creator-only { display: flex; }
         .hidden { display: none !important; }
 
-        input[type="text"] { background: #000; border: 1px solid #f44; color: #fff; padding: 12px; border-radius: 6px; flex: 1; font-size: 16px; outline: none; }
-        .control-group { flex: 1; display: flex; flex-direction: column; color: #0f4; font-size: 10px; font-weight: bold; }
-        input[type="range"] { width: 100%; accent-color: #0f4; }
+        input[type="text"] { background: #000; border: 1px solid #f44; color: #fff; padding: 10px; border-radius: 6px; flex: 1; font-size: 16px; outline: none; }
+        .control-group { flex: 1; display: flex; flex-direction: column; color: #0f4; font-size: 9px; font-weight: bold; }
+        input[type="range"] { width: 100%; accent-color: #0f4; margin: 4px 0; }
     </style>
 </head>
 <body>
@@ -49,15 +51,15 @@
                 <label>行數: <span id="rowVal">12</span></label>
                 <input type="range" id="rowSlider" min="4" max="60" step="2" value="12">
             </div>
-            <div class="control-group">
+            <div class="control-group" style="margin-left: 15px;">
                 <label>速度: <span id="speedVal">4</span></label>
                 <input type="range" id="speedSlider" min="1" max="15" step="0.5" value="4">
             </div>
         </div>
-        <div class="ui-row" style="justify-content: center;">
-            <button class="btn" id="decodeBtn" style="border-color:#f44; color:#f44; max-width: 250px;">⚡ 破解訊息</button>
-            <button class="btn creator-only" id="shareBtn" style="border-color:#0af; color:#0af; margin-left:10px;">🔗 分享</button>
-            <button class="btn creator-only" id="camBtn" style="margin-left:10px;">📷 鏡頭</button>
+        <div class="ui-row" style="justify-content: center; gap: 10px;">
+            <button class="btn" id="decodeBtn" style="border-color:#f44; color:#f44; flex: 1.5;">⚡ 破解訊息</button>
+            <button class="btn creator-only" id="shareBtn" style="border-color:#0af; color:#0af;">🔗 分享</button>
+            <button class="btn creator-only" id="camBtn">📷 鏡頭</button>
         </div>
     </div>
 </div>
@@ -81,6 +83,17 @@
             this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 5000);
             this.camera.position.z = 1000;
             
+            // 全方位字元庫
+            const kana = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン";
+            const bopomofo = "ㄅㄆㄇㄈㄉㄊㄋㄌㄍㄎㄏㄐㄑㄒㄓㄔㄕㄖㄗㄘㄙㄚㄛㄜㄝㄞㄟㄠㄡㄢㄣㄤㄥㄦㄧㄨㄩ";
+            const bagua = "☰☱☲☳☴☵☶☷";
+            const tiangan = "甲乙丙丁戊己庚辛壬癸";
+            const dizhi = "子丑寅卯辰巳午未申酉戌亥";
+            const subjects = "國英理化數地歷生音體勞";
+            const math = "0123456789+−×÷=√∞π%&";
+            const alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            const special = "郭啟利";
+
             this.params = { 
                 speed: 4, 
                 midRows: 12, 
@@ -88,8 +101,7 @@
                 decodeIdx: 0, 
                 isCracking: false, 
                 lastDecodeTime: 0,
-                // 加入注音、八卦與指定漢字
-                chars: "ㄅㄆㄇㄈㄉㄊㄋㄌㄍㄎㄏㄐㄑㄒㄓㄔㄕㄖㄗㄘㄙㄚㄛㄜㄝㄞㄟㄠㄡㄢㄣㄤㄥㄦㄧㄨㄩ郭啟利☰☱☲☳☴☵☶☷" 
+                chars: kana + bopomofo + bagua + tiangan + dizhi + subjects + math + alpha + special
             };
             this.charGroups = [];
             
@@ -111,9 +123,8 @@
                 this.params.speed = parseFloat(urlParams.get('speed')) || 4;
                 ui.classList.add('viewer-mode');
                 creators.forEach(el => el.classList.add('hidden'));
-            } else {
-                this.startCam();
             }
+            // 預設不再調用 startCam()
         }
 
         _initUI() {
@@ -147,7 +158,7 @@
                 const rows = get('rowSlider').value;
                 const speed = get('speedSlider').value;
                 const shareUrl = `${window.location.origin}${window.location.pathname}?text=${text}&rows=${rows}&speed=${speed}`;
-                navigator.clipboard.writeText(shareUrl).then(() => alert("加密連結已複製！傳送給對方吧。"));
+                navigator.clipboard.writeText(shareUrl).then(() => alert("加密連結已複製！"));
             };
 
             get('camBtn').onclick = () => this.startCam();
@@ -156,7 +167,6 @@
         _createTex(char, isNear, isRed) {
             const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 256;
             const ctx = canvas.getContext('2d');
-            // 為了讓符號更清晰，稍微調整字體粗度
             ctx.font = '900 210px "Noto Sans TC"';
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillStyle = isRed ? "#f44" : (isNear ? "#cfd" : "#0f4");
@@ -171,8 +181,8 @@
             this.params.decodeIdx = 0;
 
             const layers = [
-                { n: 'F', z: -950, sz: 60, m: 2.8, sp: 2.0 },
-                { n: 'M', z: 0,    sz: 90, m: 1.0, sp: 1.2 }, 
+                { n: 'F', z: -950, sz: 60, m: 2.8, sp: 2.2 },
+                { n: 'M', z: 0,    sz: 90, m: 1.0, sp: 1.3 }, 
                 { n: 'N', z: 450,  sz: 130,m: 0.6, sp: 1.0 }
             ];
 
@@ -231,7 +241,7 @@
                 const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
                 document.getElementById('bg-video').srcObject = s;
                 document.getElementById('bg-video').style.display = 'block';
-            } catch(e) {}
+            } catch(e) { alert("無法啟動相機，請檢查權限設定。"); }
         }
 
         onResize() {
