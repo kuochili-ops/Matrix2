@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Matrix Secret - Stealth UI</title>
+    <title>Matrix Secret - 3D Stealth UI</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@900&display=swap" rel="stylesheet">
     <style>
         body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: sans-serif; height: 100vh; }
@@ -11,15 +11,8 @@
         #bg-video { width: 100%; height: 100%; object-fit: cover; display: none; }
         #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
         
-        /* 透明遮罩層：負責監聽點擊 */
         #touch-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 50;
-            cursor: pointer;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 50; cursor: pointer;
         }
 
         #app-ui { 
@@ -27,17 +20,14 @@
             background: rgba(0,0,0,0.85); backdrop-filter: blur(15px); 
             border-top: 1px solid #0f4; 
             padding-bottom: calc(10px + env(safe-area-inset-bottom));
-            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            /* 預設隱藏面板 */
+            /* 調整速度：0.8秒緩慢升起 */
+            transition: transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
             transform: translateY(110%);
         }
         
-        /* 面板顯示狀態 */
         #app-ui.show { transform: translateY(0); }
 
-        /* 接收者模式下的特殊位置 */
         #app-ui.viewer-mode { background: transparent; border: none; bottom: 8%; display: flex; justify-content: center; transform: translateY(0); }
-        #app-ui.viewer-mode.hidden-btn { transform: translateY(200%); }
 
         .ui-content { padding: 8px 0; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; }
         .ui-row { width: 92%; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
@@ -100,15 +90,7 @@
             this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 5000);
             this.camera.position.z = 1000;
             
-            const kana = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン";
-            const bopomofo = "ㄅㄆㄇㄈㄉㄊㄋㄌㄍㄎㄏㄐㄑㄒㄓㄔㄕㄖㄗㄘㄙㄚㄛㄜㄝㄞㄟㄠㄡㄢㄣㄤㄥㄦㄧㄨㄩ";
-            const bagua = "☰☱☲☳☴☵☶☷";
-            const tiangan = "甲乙丙丁戊己庚辛壬癸";
-            const dizhi = "子丑寅卯辰巳午未申酉戌亥";
-            const subjects = "國英理化數地歷生音體勞";
-            const math = "0123456789+−×÷=√∞π%&";
-            const alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-            const special = "郭啟利";
+            const pool = "アイウエオカキクケコㄅㄆㄇㄈ☰☱☲甲乙丙丁子丑寅卯國英理化數0123456789+−×÷ABCDEFG郭啟利";
 
             this.params = { 
                 speed: 4, 
@@ -117,7 +99,7 @@
                 decodeIdx: 0, 
                 isCracking: false, 
                 lastDecodeTime: 0,
-                chars: kana + bopomofo + bagua + tiangan + dizhi + subjects + math + alpha + special
+                chars: pool
             };
             this.charGroups = [];
             
@@ -130,27 +112,23 @@
 
         _setupContext() {
             const urlParams = new URLSearchParams(window.location.search);
-            const ui = document.getElementById('app-ui');
-            const creators = document.querySelectorAll('.creator-only');
-
             if (urlParams.has('text')) {
+                const ui = document.getElementById('app-ui');
                 this.params.decodeMsg = urlParams.get('text');
                 this.params.midRows = parseInt(urlParams.get('rows')) || 12;
                 this.params.speed = parseFloat(urlParams.get('speed')) || 4;
                 ui.classList.add('viewer-mode');
-                creators.forEach(el => el.classList.add('hidden'));
+                document.querySelectorAll('.creator-only').forEach(el => el.classList.add('hidden'));
             }
         }
 
         _initUI() {
             const get = (id) => document.getElementById(id);
             const ui = get('app-ui');
-            const dBtn = get('decodeBtn');
             const overlay = get('touch-overlay');
 
-            // 點擊遮罩切換面板顯示/隱藏
             overlay.onclick = () => {
-                if (ui.classList.contains('viewer-mode')) return; // 接收者模式不切換
+                if (ui.classList.contains('viewer-mode')) return;
                 ui.classList.toggle('show');
             };
 
@@ -164,25 +142,17 @@
                 get('speedVal').innerText = this.params.speed;
             };
             
-            dBtn.onclick = () => {
+            get('decodeBtn').onclick = (e) => {
                 this.params.isCracking = !this.params.isCracking;
-                if (this.params.isCracking) {
-                    if (!this.params.decodeMsg) this.params.decodeMsg = get('decodeInput').value;
-                    dBtn.classList.add('active');
-                    dBtn.innerText = "🛑 停止破解";
-                    // 接收者模式點擊後，按鈕也可以考慮隱藏或縮小
-                } else {
-                    dBtn.classList.remove('active');
-                    dBtn.innerText = "⚡ 破解訊息";
-                }
+                e.target.classList.toggle('active', this.params.isCracking);
+                e.target.innerText = this.params.isCracking ? "🛑 停止破解" : "⚡ 破解訊息";
+                if (this.params.isCracking && !this.params.decodeMsg) this.params.decodeMsg = get('decodeInput').value;
             };
 
             get('shareBtn').onclick = () => {
                 const text = encodeURIComponent(get('decodeInput').value);
-                const rows = get('rowSlider').value;
-                const speed = get('speedSlider').value;
-                const shareUrl = `${window.location.origin}${window.location.pathname}?text=${text}&rows=${rows}&speed=${speed}`;
-                navigator.clipboard.writeText(shareUrl).then(() => alert("加密連結已複製！點擊畫面任何處可收合面板。"));
+                const shareUrl = `${window.location.origin}${window.location.pathname}?text=${text}&rows=${get('rowSlider').value}&speed=${get('speedSlider').value}`;
+                navigator.clipboard.writeText(shareUrl).then(() => alert("連結已複製！點擊背景切換面板。"));
             };
         }
 
@@ -200,8 +170,6 @@
         updateRows() {
             this.charGroups.forEach(g => { g.children[0].material.map.dispose(); this.scene.remove(g); });
             this.charGroups = [];
-            this.params.decodeIdx = 0;
-
             const layers = [
                 { n: 'F', z: -950, sz: 60, m: 2.8, sp: 2.2 },
                 { n: 'M', z: 0,    sz: 90, m: 1.0, sp: 1.3 }, 
@@ -215,9 +183,13 @@
                 for (let r = 0; r < rows; r++) {
                     const g = new THREE.Group();
                     const rc = this.params.chars[Math.floor(Math.random()*this.params.chars.length)];
-                    const m = new THREE.Mesh(new THREE.PlaneGeometry(l.sz, l.sz), new THREE.MeshBasicMaterial({ map: this._createTex(rc, l.n==='N', false), transparent: true }));
+                    const m = new THREE.Mesh(
+                        new THREE.PlaneGeometry(l.sz, l.sz), 
+                        new THREE.MeshBasicMaterial({ map: this._createTex(rc, l.n==='N', false), transparent: true, side: THREE.DoubleSide })
+                    );
                     g.add(m);
-                    g.userData = { l, off: Math.random()*1000, spd: 0.8+Math.random()*0.4, isD: false };
+                    // 加入隨機旋轉偏量與旋轉速度
+                    g.userData = { l, off: Math.random()*1000, spd: 0.8+Math.random()*0.4, rotSpd: (Math.random()-0.5)*0.05 };
                     g.position.set((r - (rows - 1)/2) * spacing, 2000, l.z);
                     this.scene.add(g);
                     this.charGroups.push(g);
@@ -230,13 +202,12 @@
             const time = now * 0.001 * this.params.speed;
 
             if (this.params.isCracking && this.params.decodeMsg.length > 0) {
-                if (this.params.decodeIdx >= this.params.decodeMsg.length) this.params.decodeIdx = 0;
                 if (now - this.params.lastDecodeTime > 200) {
                     const pool = this.charGroups.filter(g => !g.userData.isD && g.userData.l.n !== 'F' && Math.abs(g.position.y) < 850);
                     if (pool.length > 0) {
                         const t = pool[Math.floor(Math.random()*pool.length)];
                         t.children[0].material.map.dispose();
-                        t.children[0].material.map = this._createTex(this.params.decodeMsg[this.params.decodeIdx], t.userData.l.n==='N', true);
+                        t.children[0].material.map = this._createTex(this.params.decodeMsg[this.params.decodeIdx % this.params.decodeMsg.length], t.userData.l.n==='N', true);
                         t.userData.isD = true;
                         this.params.decodeIdx++;
                         this.params.lastDecodeTime = now;
@@ -247,11 +218,17 @@
             this.charGroups.forEach(g => {
                 const p = (time * g.userData.l.m * g.userData.spd + g.userData.off) % 6;
                 g.position.y = 1500 - p * 600;
-                if (g.position.y < -1100 && g.userData.isD) {
-                    g.userData.isD = false;
-                    const rc = this.params.chars[Math.floor(Math.random()*this.params.chars.length)];
-                    g.children[0].material.map.dispose();
-                    g.children[0].material.map = this._createTex(rc, g.userData.l.n==='N', false);
+                
+                // 核心更新：加入 Y 軸旋轉，產生立體側邊感
+                g.rotation.y += g.userData.rotSpd;
+
+                if (g.position.y < -1100) {
+                    if (g.userData.isD) {
+                        g.userData.isD = false;
+                        const rc = this.params.chars[Math.floor(Math.random()*this.params.chars.length)];
+                        g.children[0].material.map.dispose();
+                        g.children[0].material.map = this._createTex(rc, g.userData.l.n==='N', false);
+                    }
                 }
             });
             this.renderer.render(this.scene, this.camera);
