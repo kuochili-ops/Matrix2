@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Matrix Classified Message</title>
+    <title>Matrix Secret - Oriental Code</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@900&display=swap" rel="stylesheet">
     <style>
         body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: sans-serif; height: 100vh; }
@@ -18,25 +18,18 @@
             transition: transform 0.3s ease;
         }
         
-        /* 收件人模式下的特殊 UI 樣式 */
-        #app-ui.viewer-mode {
-            background: transparent;
-            border-top: none;
-            bottom: 15%; /* 讓按鈕浮在畫面中間偏下 */
-            display: flex;
-            justify-content: center;
-        }
+        #app-ui.viewer-mode { background: transparent; border: none; bottom: 12%; display: flex; justify-content: center; }
 
-        .ui-content { padding: 12px 0; display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
-        .ui-row { width: 92%; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .ui-content { padding: 15px 0; display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+        .ui-row { width: 90%; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
         
         .btn { flex: 1; height: 50px; background: #111; border: 1px solid #0f4; border-radius: 8px; color: #0f4; font-weight: bold; font-size: 14px; transition: 0.3s; cursor: pointer; }
-        .btn.active { background: #f44; color: #fff; border-color: #fff; box-shadow: 0 0 20px #f44; }
+        .btn.active { background: #f44; color: #fff; border-color: #fff; box-shadow: 0 0 25px #f44; }
         
-        /* 隱藏元素 */
-        .hidden-el { display: none !important; }
+        .creator-only { display: flex; }
+        .hidden { display: none !important; }
 
-        input[type="text"] { background: #000; border: 1px solid #f44; color: #fff; padding: 10px; border-radius: 6px; flex: 1; font-size: 16px; outline: none; }
+        input[type="text"] { background: #000; border: 1px solid #f44; color: #fff; padding: 12px; border-radius: 6px; flex: 1; font-size: 16px; outline: none; }
         .control-group { flex: 1; display: flex; flex-direction: column; color: #0f4; font-size: 10px; font-weight: bold; }
         input[type="range"] { width: 100%; accent-color: #0f4; }
     </style>
@@ -49,9 +42,8 @@
 <div id="app-ui">
     <div class="ui-content">
         <div class="ui-row creator-only">
-            <input type="text" id="decodeInput" placeholder="在此輸入要傳送的訊息...">
+            <input type="text" id="decodeInput" placeholder="輸入要加密的訊息...">
         </div>
-        
         <div class="ui-row creator-only">
             <div class="control-group">
                 <label>行數: <span id="rowVal">12</span></label>
@@ -62,11 +54,10 @@
                 <input type="range" id="speedSlider" min="1" max="15" step="0.5" value="4">
             </div>
         </div>
-
         <div class="ui-row" style="justify-content: center;">
-            <button class="btn" id="decodeBtn" style="border-color:#f44; color:#f44; max-width: 200px;">⚡ 破解訊息</button>
-            <button class="btn creator-only" id="shareBtn" style="border-color:#0af; color:#0af; margin-left:8px;">🔗 分享</button>
-            <button class="btn creator-only" id="camBtn" style="margin-left:8px;">📷 鏡頭</button>
+            <button class="btn" id="decodeBtn" style="border-color:#f44; color:#f44; max-width: 250px;">⚡ 破解訊息</button>
+            <button class="btn creator-only" id="shareBtn" style="border-color:#0af; color:#0af; margin-left:10px;">🔗 分享</button>
+            <button class="btn creator-only" id="camBtn" style="margin-left:10px;">📷 鏡頭</button>
         </div>
     </div>
 </div>
@@ -90,30 +81,37 @@
             this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 5000);
             this.camera.position.z = 1000;
             
-            this.params = { speed: 4, midRows: 12, decodeMsg: "", decodeIdx: 0, isCracking: false, lastDecodeTime: 0, chars: "虚実数解空間01ホUNKOWN" };
+            this.params = { 
+                speed: 4, 
+                midRows: 12, 
+                decodeMsg: "", 
+                decodeIdx: 0, 
+                isCracking: false, 
+                lastDecodeTime: 0,
+                // 加入注音、八卦與指定漢字
+                chars: "ㄅㄆㄇㄈㄉㄊㄋㄌㄍㄎㄏㄐㄑㄒㄓㄔㄕㄖㄗㄘㄙㄚㄛㄜㄝㄞㄟㄠㄡㄢㄣㄤㄥㄦㄧㄨㄩ郭啟利☰☱☲☳☴☵☶☷" 
+            };
             this.charGroups = [];
             
-            this._setupMode();
+            this._setupContext();
             this._initUI();
             this.updateRows();
             this._animate();
             window.addEventListener('resize', () => this.onResize());
         }
 
-        _setupMode() {
+        _setupContext() {
             const urlParams = new URLSearchParams(window.location.search);
             const ui = document.getElementById('app-ui');
             const creators = document.querySelectorAll('.creator-only');
 
             if (urlParams.has('text')) {
-                // 收件人模式
                 this.params.decodeMsg = urlParams.get('text');
                 this.params.midRows = parseInt(urlParams.get('rows')) || 12;
                 this.params.speed = parseFloat(urlParams.get('speed')) || 4;
                 ui.classList.add('viewer-mode');
-                creators.forEach(el => el.classList.add('hidden-el'));
+                creators.forEach(el => el.classList.add('hidden'));
             } else {
-                // 寄件人模式：預設開啟鏡頭增加創作氛圍
                 this.startCam();
             }
         }
@@ -149,7 +147,7 @@
                 const rows = get('rowSlider').value;
                 const speed = get('speedSlider').value;
                 const shareUrl = `${window.location.origin}${window.location.pathname}?text=${text}&rows=${rows}&speed=${speed}`;
-                navigator.clipboard.writeText(shareUrl).then(() => alert("連結已複製！傳給對方後，他們只能看到破解鍵。"));
+                navigator.clipboard.writeText(shareUrl).then(() => alert("加密連結已複製！傳送給對方吧。"));
             };
 
             get('camBtn').onclick = () => this.startCam();
@@ -158,7 +156,8 @@
         _createTex(char, isNear, isRed) {
             const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 256;
             const ctx = canvas.getContext('2d');
-            ctx.font = '900 200px "Noto Sans TC"';
+            // 為了讓符號更清晰，稍微調整字體粗度
+            ctx.font = '900 210px "Noto Sans TC"';
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillStyle = isRed ? "#f44" : (isNear ? "#cfd" : "#0f4");
             ctx.shadowBlur = 15; ctx.shadowColor = isRed ? "#f00" : "#0f4";
@@ -172,14 +171,15 @@
             this.params.decodeIdx = 0;
 
             const layers = [
-                { n: 'F', z: -900, sz: 60, m: 2.5, sp: 1.8 },
+                { n: 'F', z: -950, sz: 60, m: 2.8, sp: 2.0 },
                 { n: 'M', z: 0,    sz: 90, m: 1.0, sp: 1.2 }, 
                 { n: 'N', z: 450,  sz: 130,m: 0.6, sp: 1.0 }
             ];
 
             layers.forEach(l => {
                 const rows = Math.max(1, Math.floor(this.params.midRows * l.m));
-                const spacing = (window.innerWidth * (1 + Math.abs(l.z)/1000) * l.sp) / rows;
+                const totalW = window.innerWidth * (1 + Math.abs(l.z)/1000) * l.sp;
+                const spacing = totalW / rows;
                 for (let r = 0; r < rows; r++) {
                     const g = new THREE.Group();
                     const rc = this.params.chars[Math.floor(Math.random()*this.params.chars.length)];
@@ -200,7 +200,7 @@
             if (this.params.isCracking && this.params.decodeMsg.length > 0) {
                 if (this.params.decodeIdx >= this.params.decodeMsg.length) this.params.decodeIdx = 0;
                 if (now - this.params.lastDecodeTime > 200) {
-                    const pool = this.charGroups.filter(g => !g.userData.isD && g.userData.l.n !== 'F' && Math.abs(g.position.y) < 800);
+                    const pool = this.charGroups.filter(g => !g.userData.isD && g.userData.l.n !== 'F' && Math.abs(g.position.y) < 850);
                     if (pool.length > 0) {
                         const t = pool[Math.floor(Math.random()*pool.length)];
                         t.children[0].material.map.dispose();
