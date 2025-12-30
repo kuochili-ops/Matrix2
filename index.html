@@ -3,41 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Matrix Secret - 3D Volume Edition</title>
+    <title>Matrix Secret - Deep Volume</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@900&display=swap" rel="stylesheet">
     <style>
         body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: sans-serif; height: 100vh; }
         #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
-        
-        #touch-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 50; cursor: pointer;
-        }
-
+        #touch-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 50; cursor: pointer; }
         #app-ui { 
             position: absolute; bottom: 0; left: 0; width: 100%; z-index: 100; 
             background: rgba(0,0,0,0.85); backdrop-filter: blur(15px); 
-            border-top: 1px solid #0f4; 
-            padding-bottom: calc(10px + env(safe-area-inset-bottom));
-            /* 調整為 0.8s 緩慢優雅升起 */
+            border-top: 1px solid #0f4; padding-bottom: calc(10px + env(safe-area-inset-bottom));
             transition: transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
             transform: translateY(110%);
         }
-        
         #app-ui.show { transform: translateY(0); }
         #app-ui.viewer-mode { background: transparent; border: none; bottom: 8%; display: flex; justify-content: center; transform: translateY(0); }
-
         .ui-content { padding: 8px 0; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; }
         .ui-row { width: 92%; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-        
-        .btn { flex: 1; height: 46px; background: #111; border: 1px solid #0f4; border-radius: 8px; color: #0f4; font-weight: bold; font-size: 13px; transition: 0.3s; cursor: pointer; }
+        .btn { flex: 1; height: 46px; background: #111; border: 1px solid #0f4; border-radius: 8px; color: #0f4; font-weight: bold; font-size: 13px; cursor: pointer; }
         .btn.active { background: #f44; color: #fff; border-color: #fff; box-shadow: 0 0 25px #f44; }
-        
-        .creator-only { display: flex; }
-        .hidden { display: none !important; }
-
         input[type="text"] { background: #000; border: 1px solid #f44; color: #fff; padding: 10px; border-radius: 6px; flex: 1; font-size: 16px; outline: none; }
         .control-group { flex: 1; display: flex; flex-direction: column; color: #0f4; font-size: 9px; font-weight: bold; }
         input[type="range"] { width: 100%; accent-color: #0f4; margin: 4px 0; }
+        .creator-only { display: flex; }
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
@@ -143,7 +132,7 @@
             get('shareBtn').onclick = () => {
                 const text = encodeURIComponent(get('decodeInput').value);
                 const shareUrl = `${window.location.origin}${window.location.pathname}?text=${text}&rows=${get('rowSlider').value}&speed=${get('speedSlider').value}`;
-                navigator.clipboard.writeText(shareUrl).then(() => alert("連結已複製！點擊背景切換面板。"));
+                navigator.clipboard.writeText(shareUrl).then(() => alert("連結已複製！"));
             };
         }
 
@@ -175,28 +164,30 @@
                 const rows = Math.max(1, Math.floor(this.params.midRows * l.m));
                 const totalW = window.innerWidth * (1 + Math.abs(l.z)/1000) * l.sp;
                 const spacing = totalW / rows;
-                const texPool = this.params.chars.split('').map(c => this._createTex(c, l.n==='N', false));
 
                 for (let r = 0; r < rows; r++) {
                     const g = new THREE.Group();
-                    const rt = texPool[Math.floor(Math.random()*texPool.length)];
+                    const rc = this.params.chars[Math.floor(Math.random()*this.params.chars.length)];
+                    const rt = this._createTex(rc, l.n==='N', false);
                     
-                    // 實作輕微厚度：疊加 3 層
-                    for (let i = 0; i < 3; i++) {
+                    // 核心調整：提升至 5 層厚度，間距加大至 4
+                    const depthCount = 5;
+                    for (let i = 0; i < depthCount; i++) {
                         const m = new THREE.Mesh(
                             new THREE.PlaneGeometry(l.sz, l.sz), 
                             new THREE.MeshBasicMaterial({ 
                                 map: rt, 
                                 transparent: true, 
                                 side: THREE.DoubleSide,
-                                color: new THREE.Color(1, 1, 1).multiplyScalar(1 - i * 0.25) // 越深越暗
+                                // 顏色階梯漸變，強化立體感
+                                color: new THREE.Color(1, 1, 1).multiplyScalar(1 - i * 0.15) 
                             })
                         );
-                        m.position.z = -i * 2.5; // 每層位移 2.5 單位
+                        m.position.z = -i * 4.0; 
                         g.add(m);
                     }
                     
-                    g.userData = { l, off: Math.random()*1000, spd: 0.8+Math.random()*0.4, rotSpd: (Math.random()-0.5)*0.06 };
+                    g.userData = { l, off: Math.random()*1000, spd: 0.8+Math.random()*0.4, rotSpd: (Math.random()-0.5)*0.08 };
                     g.position.set((r - (rows - 1)/2) * spacing, 2000, l.z);
                     this.scene.add(g);
                     this.charGroups.push(g);
@@ -225,7 +216,7 @@
             this.charGroups.forEach(g => {
                 const p = (time * g.userData.l.m * g.userData.spd + g.userData.off) % 6;
                 g.position.y = 1500 - p * 600;
-                g.rotation.y += g.userData.rotSpd; // 隨機 Y 軸旋轉展現厚度
+                g.rotation.y += g.userData.rotSpd; // 執行隨機旋轉
 
                 if (g.position.y < -1100 && g.userData.isD) {
                     g.userData.isD = false;
