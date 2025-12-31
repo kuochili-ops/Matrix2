@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Matrix Secret - Deep Volume</title>
+    <title>Matrix Secret - Auto Slow Mode</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@900&display=swap" rel="stylesheet">
     <style>
         body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: sans-serif; height: 100vh; }
@@ -78,8 +78,14 @@
             const pool = "アイウエオㄅㄆㄇㄈ☰☱甲乙丙丁子丑國英理化0123+−×ABC郭啟利";
 
             this.params = { 
-                speed: 4, midRows: 12, decodeMsg: "", decodeIdx: 0, 
-                isCracking: false, lastDecodeTime: 0, chars: pool
+                speed: 4, 
+                originalSpeed: 4, // 用於儲存原本的速度
+                midRows: 12, 
+                decodeMsg: "", 
+                decodeIdx: 0, 
+                isCracking: false, 
+                lastDecodeTime: 0, 
+                chars: pool
             };
             this.charGroups = [];
             
@@ -97,6 +103,7 @@
                 this.params.decodeMsg = urlParams.get('text');
                 this.params.midRows = parseInt(urlParams.get('rows')) || 12;
                 this.params.speed = parseFloat(urlParams.get('speed')) || 4;
+                this.params.originalSpeed = this.params.speed;
                 ui.classList.add('viewer-mode');
                 document.querySelectorAll('.creator-only').forEach(el => el.classList.add('hidden'));
             }
@@ -106,6 +113,8 @@
             const get = (id) => document.getElementById(id);
             const ui = get('app-ui');
             const overlay = get('touch-overlay');
+            const speedSlider = get('speedSlider');
+            const speedVal = get('speedVal');
 
             overlay.onclick = () => {
                 if (ui.classList.contains('viewer-mode')) return;
@@ -117,21 +126,39 @@
                 get('rowVal').innerText = this.params.midRows;
                 this.updateRows(); 
             };
-            get('speedSlider').oninput = (e) => {
+
+            speedSlider.oninput = (e) => {
                 this.params.speed = parseFloat(e.target.value);
-                get('speedVal').innerText = this.params.speed;
+                // 只有在非破解狀態下才更新原始速度紀錄
+                if (!this.params.isCracking) {
+                    this.params.originalSpeed = this.params.speed;
+                }
+                speedVal.innerText = this.params.speed;
             };
             
             get('decodeBtn').onclick = (e) => {
                 this.params.isCracking = !this.params.isCracking;
                 e.target.classList.toggle('active', this.params.isCracking);
                 e.target.innerText = this.params.isCracking ? "🛑 停止破解" : "⚡ 破解訊息";
-                if (this.params.isCracking && !this.params.decodeMsg) this.params.decodeMsg = get('decodeInput').value;
+
+                if (this.params.isCracking) {
+                    // 開始破解：記錄當前速度並設為 1
+                    this.params.originalSpeed = this.params.speed;
+                    this.params.speed = 1;
+                    if (!this.params.decodeMsg) this.params.decodeMsg = get('decodeInput').value;
+                } else {
+                    // 停止破解：恢復原始速度
+                    this.params.speed = this.params.originalSpeed;
+                }
+
+                // 同步更新 UI 顯示
+                speedSlider.value = this.params.speed;
+                speedVal.innerText = this.params.speed;
             };
 
             get('shareBtn').onclick = () => {
                 const text = encodeURIComponent(get('decodeInput').value);
-                const shareUrl = `${window.location.origin}${window.location.pathname}?text=${text}&rows=${get('rowSlider').value}&speed=${get('speedSlider').value}`;
+                const shareUrl = `${window.location.origin}${window.location.pathname}?text=${text}&rows=${get('rowSlider').value}&speed=${this.params.originalSpeed}`;
                 navigator.clipboard.writeText(shareUrl).then(() => alert("連結已複製！"));
             };
         }
@@ -170,17 +197,14 @@
                     const rc = this.params.chars[Math.floor(Math.random()*this.params.chars.length)];
                     const rt = this._createTex(rc, l.n==='N', false);
                     
-                    // 核心調整：提升至 5 層厚度，間距加大至 4
-                    const depthCount = 5;
-                    for (let i = 0; i < depthCount; i++) {
+                    for (let i = 0; i < 5; i++) {
                         const m = new THREE.Mesh(
                             new THREE.PlaneGeometry(l.sz, l.sz), 
                             new THREE.MeshBasicMaterial({ 
                                 map: rt, 
                                 transparent: true, 
                                 side: THREE.DoubleSide,
-                                // 顏色階梯漸變，強化立體感
-                                color: new THREE.Color(1, 1, 1).multiplyScalar(1 - i * 0.15) 
+                                color: new THREE.Color(1, 1, 1).multiplyScalar(1 - i * 0.15)
                             })
                         );
                         m.position.z = -i * 4.0; 
@@ -216,7 +240,7 @@
             this.charGroups.forEach(g => {
                 const p = (time * g.userData.l.m * g.userData.spd + g.userData.off) % 6;
                 g.position.y = 1500 - p * 600;
-                g.rotation.y += g.userData.rotSpd; // 執行隨機旋轉
+                g.rotation.y += g.userData.rotSpd;
 
                 if (g.position.y < -1100 && g.userData.isD) {
                     g.userData.isD = false;
