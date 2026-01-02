@@ -3,12 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Matrix Secret - Auto Slow Mode</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@900&display=swap" rel="stylesheet">
+    <title>Matrix Secret - CRT Decryptor</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Mono:wght@700&family=Noto+Sans+TC:wght@900&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: sans-serif; height: 100vh; }
-        #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
-        #touch-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 50; cursor: pointer; }
+        body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: 'Noto Sans Mono', monospace; height: 100vh; }
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; }
+        
+        /* CRT 收集區樣式 */
+        #crt-console {
+            position: fixed; bottom: calc(20px + env(safe-area-inset-bottom)); left: 50%;
+            transform: translateX(-50%); width: 90%; max-width: 500px;
+            background: #020; border: 2px solid #0f4; border-radius: 4px;
+            padding: 10px; z-index: 60; pointer-events: none;
+            box-shadow: 0 0 15px rgba(0, 255, 68, 0.3);
+            display: none; /* 初始隱藏，破解時開啟 */
+        }
+        #crt-console.active { display: block; }
+        #crt-text {
+            color: #0f4; font-size: 18px; line-height: 1.4; min-height: 1.4em;
+            text-shadow: 0 0 5px #0f4; letter-spacing: 2px; word-break: break-all;
+        }
+        /* CRT 掃描線效果 */
+        #crt-console::before {
+            content: " "; position: absolute; top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background-size: 100% 3px, 3px 100%; pointer-events: none;
+        }
+
+        #touch-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 50; }
         #app-ui { 
             position: absolute; bottom: 0; left: 0; width: 100%; z-index: 100; 
             background: rgba(0,0,0,0.85); backdrop-filter: blur(15px); 
@@ -17,14 +39,15 @@
             transform: translateY(110%);
         }
         #app-ui.show { transform: translateY(0); }
-        #app-ui.viewer-mode { background: transparent; border: none; bottom: 8%; display: flex; justify-content: center; transform: translateY(0); }
-        .ui-content { padding: 8px 0; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; }
+        #app-ui.viewer-mode { background: transparent; border: none; transform: translateY(0); bottom: 15%; }
+        
+        .ui-content { padding: 8px 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
         .ui-row { width: 92%; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-        .btn { flex: 1; height: 46px; background: #111; border: 1px solid #0f4; border-radius: 8px; color: #0f4; font-weight: bold; font-size: 13px; cursor: pointer; }
-        .btn.active { background: #f44; color: #fff; border-color: #fff; box-shadow: 0 0 25px #f44; }
-        input[type="text"] { background: #000; border: 1px solid #f44; color: #fff; padding: 10px; border-radius: 6px; flex: 1; font-size: 16px; outline: none; }
-        .control-group { flex: 1; display: flex; flex-direction: column; color: #0f4; font-size: 9px; font-weight: bold; }
-        input[type="range"] { width: 100%; accent-color: #0f4; margin: 4px 0; }
+        .btn { flex: 1; height: 46px; background: #111; border: 1px solid #0f4; border-radius: 8px; color: #0f4; font-weight: bold; cursor: pointer; }
+        .btn.active { background: #f44; color: #fff; border-color: #fff; box-shadow: 0 0 20px #f44; }
+        input[type="text"] { background: #000; border: 1px solid #f44; color: #fff; padding: 10px; border-radius: 6px; flex: 1; outline: none; }
+        .control-group { flex: 1; display: flex; flex-direction: column; color: #0f4; font-size: 9px; }
+        input[type="range"] { width: 100%; accent-color: #0f4; }
         .creator-only { display: flex; }
         .hidden { display: none !important; }
     </style>
@@ -33,6 +56,10 @@
 
 <div id="canvas-container"></div>
 <div id="touch-overlay"></div>
+
+<div id="crt-console">
+    <div id="crt-text">_</div>
+</div>
 
 <div id="app-ui">
     <div class="ui-content">
@@ -50,7 +77,7 @@
             </div>
         </div>
         <div class="ui-row" style="justify-content: center; gap: 10px;">
-            <button class="btn" id="decodeBtn" style="border-color:#f44; color:#f44; flex: 1.5;">⚡ 破解訊息</button>
+            <button class="btn" id="decodeBtn" style="border-color:#f44; color:#f44; flex: 1.5;">⚡ 啟動解密</button>
             <button class="btn creator-only" id="shareBtn" style="border-color:#0af; color:#0af;">🔗 分享</button>
         </div>
     </div>
@@ -67,25 +94,19 @@
             this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             this.renderer.setSize(window.innerWidth, window.innerHeight);
             this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-            document.body.appendChild(this.renderer.domElement);
-            this.renderer.domElement.style.position = "fixed";
-            this.renderer.domElement.style.top = "0";
-            this.renderer.domElement.style.zIndex = "10";
+            document.getElementById('canvas-container').appendChild(this.renderer.domElement);
 
             this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 5000);
             this.camera.position.z = 1000;
             
-            const pool = "アイウエオㄅㄆㄇㄈ☰☱甲乙丙丁子丑國英理化0123+−×ABC郭啟利";
-
+            this.raycaster = new THREE.Raycaster();
+            this.mouse = new THREE.Vector2();
+            
             this.params = { 
-                speed: 4, 
-                originalSpeed: 4, // 用於儲存原本的速度
-                midRows: 12, 
-                decodeMsg: "", 
-                decodeIdx: 0, 
-                isCracking: false, 
-                lastDecodeTime: 0, 
-                chars: pool
+                speed: 4, originalSpeed: 4, midRows: 12, 
+                decodeMsg: "", collectedIndices: new Set(),
+                isCracking: false, lastDecodeTime: 0, 
+                chars: "アイウエオㄅㄆㄇㄈ☰☱甲乙丙丁子丑國英理化0123+−×ABC郭啟利"
             };
             this.charGroups = [];
             
@@ -99,12 +120,11 @@
         _setupContext() {
             const urlParams = new URLSearchParams(window.location.search);
             if (urlParams.has('text')) {
-                const ui = document.getElementById('app-ui');
                 this.params.decodeMsg = urlParams.get('text');
                 this.params.midRows = parseInt(urlParams.get('rows')) || 12;
                 this.params.speed = parseFloat(urlParams.get('speed')) || 4;
                 this.params.originalSpeed = this.params.speed;
-                ui.classList.add('viewer-mode');
+                document.getElementById('app-ui').classList.add('viewer-mode');
                 document.querySelectorAll('.creator-only').forEach(el => el.classList.add('hidden'));
             }
         }
@@ -113,13 +133,15 @@
             const get = (id) => document.getElementById(id);
             const ui = get('app-ui');
             const overlay = get('touch-overlay');
-            const speedSlider = get('speedSlider');
-            const speedVal = get('speedVal');
 
-            overlay.onclick = () => {
-                if (ui.classList.contains('viewer-mode')) return;
-                ui.classList.toggle('show');
-            };
+            // 點擊事件：區分「切換面板」與「收集字元」
+            overlay.addEventListener('click', (e) => {
+                if (this.params.isCracking) {
+                    this._onPoint(e); // 嘗試收集字元
+                } else {
+                    if (!ui.classList.contains('viewer-mode')) ui.classList.toggle('show');
+                }
+            });
 
             get('rowSlider').oninput = (e) => { 
                 this.params.midRows = parseInt(e.target.value); 
@@ -127,33 +149,30 @@
                 this.updateRows(); 
             };
 
-            speedSlider.oninput = (e) => {
-                this.params.speed = parseFloat(e.target.value);
-                // 只有在非破解狀態下才更新原始速度紀錄
+            get('speedSlider').oninput = (e) => {
                 if (!this.params.isCracking) {
+                    this.params.speed = parseFloat(e.target.value);
                     this.params.originalSpeed = this.params.speed;
+                    get('speedVal').innerText = this.params.speed;
                 }
-                speedVal.innerText = this.params.speed;
             };
             
             get('decodeBtn').onclick = (e) => {
                 this.params.isCracking = !this.params.isCracking;
                 e.target.classList.toggle('active', this.params.isCracking);
-                e.target.innerText = this.params.isCracking ? "🛑 停止破解" : "⚡ 破解訊息";
+                e.target.innerText = this.params.isCracking ? "🛑 停止解密" : "⚡ 啟動解密";
+                
+                get('crt-console').classList.toggle('active', this.params.isCracking);
 
                 if (this.params.isCracking) {
-                    // 開始破解：記錄當前速度並設為 1
                     this.params.originalSpeed = this.params.speed;
                     this.params.speed = 1;
                     if (!this.params.decodeMsg) this.params.decodeMsg = get('decodeInput').value;
+                    this.params.collectedIndices.clear();
+                    this._updateCRT();
                 } else {
-                    // 停止破解：恢復原始速度
                     this.params.speed = this.params.originalSpeed;
                 }
-
-                // 同步更新 UI 顯示
-                speedSlider.value = this.params.speed;
-                speedVal.innerText = this.params.speed;
             };
 
             get('shareBtn').onclick = () => {
@@ -163,13 +182,38 @@
             };
         }
 
+        _onPoint(event) {
+            this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            this.raycaster.setFromCamera(this.mouse, this.camera);
+
+            const intersects = this.raycaster.intersectObjects(this.scene.children, true);
+            if (intersects.length > 0) {
+                const obj = intersects[0].object.parent; // 取得 Group
+                if (obj.userData.isD && !obj.userData.collected) {
+                    obj.userData.collected = true;
+                    this.params.collectedIndices.add(obj.userData.msgIdx);
+                    obj.visible = false; // 點擊後消失
+                    this._updateCRT();
+                }
+            }
+        }
+
+        _updateCRT() {
+            let display = "";
+            for (let i = 0; i < this.params.decodeMsg.length; i++) {
+                display += this.params.collectedIndices.has(i) ? this.params.decodeMsg[i] : "_";
+            }
+            document.getElementById('crt-text').innerText = display;
+        }
+
         _createTex(char, isNear, isRed) {
             const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 256;
             const ctx = canvas.getContext('2d');
             ctx.font = '900 210px "Noto Sans TC"';
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillStyle = isRed ? "#f44" : (isNear ? "#cfd" : "#0f4");
-            ctx.shadowBlur = 15; ctx.shadowColor = isRed ? "#f00" : "#0f4";
+            ctx.shadowBlur = 20; ctx.shadowColor = isRed ? "#f00" : "#0f4";
             ctx.fillText(char, 128, 128);
             return new THREE.CanvasTexture(canvas);
         }
@@ -180,38 +224,23 @@
                 this.scene.remove(g); 
             });
             this.charGroups = [];
-            
             const layers = [
                 { n: 'F', z: -950, sz: 60, m: 2.8, sp: 2.2 },
                 { n: 'M', z: 0,    sz: 90, m: 1.0, sp: 1.3 }, 
                 { n: 'N', z: 450,  sz: 130,m: 0.6, sp: 1.0 }
             ];
-
             layers.forEach(l => {
                 const rows = Math.max(1, Math.floor(this.params.midRows * l.m));
-                const totalW = window.innerWidth * (1 + Math.abs(l.z)/1000) * l.sp;
-                const spacing = totalW / rows;
-
+                const spacing = (window.innerWidth * (1 + Math.abs(l.z)/1000) * l.sp) / rows;
                 for (let r = 0; r < rows; r++) {
                     const g = new THREE.Group();
                     const rc = this.params.chars[Math.floor(Math.random()*this.params.chars.length)];
                     const rt = this._createTex(rc, l.n==='N', false);
-                    
                     for (let i = 0; i < 5; i++) {
-                        const m = new THREE.Mesh(
-                            new THREE.PlaneGeometry(l.sz, l.sz), 
-                            new THREE.MeshBasicMaterial({ 
-                                map: rt, 
-                                transparent: true, 
-                                side: THREE.DoubleSide,
-                                color: new THREE.Color(1, 1, 1).multiplyScalar(1 - i * 0.15)
-                            })
-                        );
-                        m.position.z = -i * 4.0; 
-                        g.add(m);
+                        const m = new THREE.Mesh(new THREE.PlaneGeometry(l.sz, l.sz), new THREE.MeshBasicMaterial({ map: rt, transparent: true, side: THREE.DoubleSide, color: new THREE.Color(1,1,1).multiplyScalar(1-i*0.15)}));
+                        m.position.z = -i * 4.0; g.add(m);
                     }
-                    
-                    g.userData = { l, off: Math.random()*1000, spd: 0.8+Math.random()*0.4, rotSpd: (Math.random()-0.5)*0.08 };
+                    g.userData = { l, off: Math.random()*1000, spd: 0.8+Math.random()*0.4, rotSpd: (Math.random()-0.5)*0.08, isD: false, collected: false };
                     g.position.set((r - (rows - 1)/2) * spacing, 2000, l.z);
                     this.scene.add(g);
                     this.charGroups.push(g);
@@ -224,15 +253,24 @@
             const time = now * 0.001 * this.params.speed;
 
             if (this.params.isCracking && this.params.decodeMsg.length > 0) {
-                if (now - this.params.lastDecodeTime > 200) {
-                    const pool = this.charGroups.filter(g => !g.userData.isD && g.userData.l.n !== 'F' && Math.abs(g.position.y) < 850);
-                    if (pool.length > 0) {
-                        const t = pool[Math.floor(Math.random()*pool.length)];
-                        const newTex = this._createTex(this.params.decodeMsg[this.params.decodeIdx % this.params.decodeMsg.length], t.userData.l.n==='N', true);
-                        t.children.forEach(c => { c.material.map = newTex; });
-                        t.userData.isD = true;
-                        this.params.decodeIdx++;
-                        this.params.lastDecodeTime = now;
+                if (now - this.params.lastDecodeTime > 300) {
+                    // 找出尚未被收集的字元索引
+                    const remainingIndices = [];
+                    for(let i=0; i<this.params.decodeMsg.length; i++) {
+                        if(!this.params.collectedIndices.has(i)) remainingIndices.push(i);
+                    }
+                    
+                    if (remainingIndices.length > 0) {
+                        const pool = this.charGroups.filter(g => !g.userData.isD && g.userData.l.n !== 'F' && Math.abs(g.position.y) < 800);
+                        if (pool.length > 0) {
+                            const t = pool[Math.floor(Math.random()*pool.length)];
+                            const targetIdx = remainingIndices[Math.floor(Math.random()*remainingIndices.length)];
+                            const newTex = this._createTex(this.params.decodeMsg[targetIdx], t.userData.l.n==='N', true);
+                            t.children.forEach(c => { c.material.map = newTex; });
+                            t.userData.isD = true;
+                            t.userData.msgIdx = targetIdx; // 綁定它是訊息的第幾個字
+                            this.params.lastDecodeTime = now;
+                        }
                     }
                 }
             }
@@ -242,8 +280,11 @@
                 g.position.y = 1500 - p * 600;
                 g.rotation.y += g.userData.rotSpd;
 
-                if (g.position.y < -1100 && g.userData.isD) {
+                // 只有沒被點擊收集的才顯示
+                if (g.position.y < -1100) {
                     g.userData.isD = false;
+                    g.userData.collected = false;
+                    g.visible = true; 
                     const rc = this.params.chars[Math.floor(Math.random()*this.params.chars.length)];
                     const resetTex = this._createTex(rc, g.userData.l.n==='N', false);
                     g.children.forEach(c => { c.material.map = resetTex; });
